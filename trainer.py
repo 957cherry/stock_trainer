@@ -184,7 +184,7 @@ def plot_kline(df, title, is_intraday=False):
     return fig
 
 # ============================================================
-# 5. 指标计算（完整版，所有键都在）
+# 5. 指标计算
 # ============================================================
 def calculate_all_indicators(df, current_idx):
     slice_df = df.iloc[:current_idx+1].copy()
@@ -195,7 +195,6 @@ def calculate_all_indicators(df, current_idx):
     ma20 = slice_df["close"].rolling(20).mean().iloc[-1] if len(slice_df) >= 20 else ma5
     ma60 = slice_df["close"].rolling(60).mean().iloc[-1] if len(slice_df) >= 60 else ma20
 
-    # 均价线
     avg_prices = (slice_df["open"] + slice_df["high"] + slice_df["low"] + slice_df["close"]) / 4
     cum_amount = (avg_prices * slice_df["volume"]).cumsum()
     cum_volume = slice_df["volume"].cumsum()
@@ -208,11 +207,9 @@ def calculate_all_indicators(df, current_idx):
     else:
         avg_position = "接近均价线 (中性)"
 
-    # 量比
     vol_avg = slice_df["volume"].iloc[-6:-1].mean() if len(slice_df) >= 6 else slice_df["volume"].mean()
     vol_ratio = last["volume"] / vol_avg if vol_avg > 0 else 1
 
-    # MACD
     if len(slice_df) >= 30:
         exp1 = slice_df["close"].ewm(span=12, adjust=False).mean()
         exp2 = slice_df["close"].ewm(span=26, adjust=False).mean()
@@ -232,7 +229,6 @@ def calculate_all_indicators(df, current_idx):
     else:
         macd_status, macd_hist_value, macd_cross = "数据不足", 0, "数据不足"
 
-    # RSI
     if len(slice_df) >= 15:
         delta = slice_df["close"].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
@@ -243,7 +239,6 @@ def calculate_all_indicators(df, current_idx):
     else:
         rsi, rsi_status = 50, "数据不足"
 
-    # 价格位置
     if last["close"] > ma5 * 1.005:
         price_position = "高于MA5 (偏强)"
     elif last["close"] < ma5 * 0.995:
@@ -251,7 +246,6 @@ def calculate_all_indicators(df, current_idx):
     else:
         price_position = "接近MA5 (中性)"
 
-    # 量价
     if len(slice_df) >= 2:
         prev_close = slice_df["close"].iloc[-2]
         if vol_ratio > 1.5:
@@ -263,14 +257,12 @@ def calculate_all_indicators(df, current_idx):
     else:
         vol_price_status = "数据不足"
 
-    # 短期趋势
     if len(slice_df) >= 3:
         recent_3 = slice_df["close"].iloc[-3:]
         short_trend = "上涨" if recent_3.iloc[-1] > recent_3.iloc[0] else "下跌"
     else:
         short_trend = "震荡"
 
-    # 均线排列
     if last["close"] > ma5 and ma5 > ma20:
         ma_alignment = "多头排列（强势）"
     elif last["close"] < ma5 and ma5 < ma20:
@@ -278,7 +270,6 @@ def calculate_all_indicators(df, current_idx):
     else:
         ma_alignment = "均线交织（震荡）"
 
-    # 涨跌幅
     first_open = slice_df["open"].iloc[0]
     pct_change = (last["close"] - first_open) / first_open * 100
 
@@ -430,11 +421,14 @@ def main():
                     df_daily = fetch_daily(symbol)
                     if df_daily is not None and len(df_daily) >= 20:
                         df_intra = generate_intraday_from_multiple_days(df_daily, num_days=random.randint(5, 10))
-                        if df_intra is None or len(df_intra) < 100:
+                        if df_intra is None or len(df_intra) < 150:
                             continue
                         total_len = len(df_intra)
-                        cut_end = random.randint(60, total_len - 5)
+                        # 保证 cut_end >= 100，确保切片有数据
+                        cut_end = random.randint(100, total_len - 5)
                         display_df = df_intra.iloc[cut_end-100:cut_end].copy().reset_index(drop=True)
+                        if len(display_df) < 100:
+                            continue
                         next_row = df_intra.iloc[cut_end]
                         actual_direction = "涨" if next_row["close"] > display_df.iloc[-1]["close"] else "跌"
                         indicators = calculate_all_indicators(display_df, len(display_df)-1)
@@ -652,8 +646,6 @@ def main():
             - 亏80%需涨400%回本
 
             **合理区间**：买入价 - (0.8~2.0) × ATR
-            - 太近：容易被震出去
-            - 太远：失去止损意义
             """)
         if st.button("🎲 随机出题 (止损)", use_container_width=True, key="btn_stop"):
             with st.spinner("加载..."):
