@@ -8,7 +8,7 @@ import numpy as np
 
 st.set_page_config(page_title="K线训练器", layout="wide")
 st.title("⚔️ K线综合训练器")
-st.caption("形态 | 分时 | 板块 | 买卖点 | 止损 | 未来趋势 | 仓位 | 大盘 | 模拟盘 | 错题本")
+st.caption("形态 | 分时 | 板块 | 买卖点 | 止损 | 未来趋势 | 仓位 | 大盘 | 模拟盘 | 错题本 | 个股分析")
 
 API_KEY = st.secrets["TONGHUASHUN_API_KEY"]
 
@@ -118,7 +118,6 @@ def generate_intraday_from_multiple_days(daily_df, num_days=7, bars_per_day=48):
         "low": all_lows, "close": all_closes, "volume": all_volumes
     })
 
-# ===== 30种形态 =====
 PATTERN_DATA = {
     "大阳线": {"meaning": "收盘远高于开盘，实体很长，买方极强", "hint": "实体很长（>3%涨幅），几乎没有上下影线", "key_features": "实体很长，上下影线很短", "teaching": "低位反转，高位延续"},
     "大阴线": {"meaning": "收盘远低于开盘，实体很长，卖方极强", "hint": "实体很长（>3%跌幅），几乎没有上下影线", "key_features": "实体很长，上下影线很短", "teaching": "高位见顶，低位杀跌"},
@@ -140,16 +139,16 @@ PATTERN_DATA = {
     "平底": {"meaning": "多根K线最低点相同，水平支撑，看涨", "hint": "多个最低价接近相同", "key_features": "相同低点", "teaching": "支撑位确认"},
     "平顶": {"meaning": "多根K线最高点相同，水平压力，看跌", "hint": "多个最高价接近相同", "key_features": "相同高点", "teaching": "压力位确认"},
     "身怀六甲": {"meaning": "大K线内包小K线，趋势可能反转", "hint": "大实体→小实体", "key_features": "大包小", "teaching": "动能衰竭"},
-    "两只乌鸦": {"meaning": "高位出现两根阴线，第一根长，第二根小且跳空高开", "hint": "阳→阴→阴（第二根跳空）", "key_features": "两阴夹一阳的变形", "teaching": "高位见顶信号"},
-    "三只乌鸦": {"meaning": "连续三根阴线，每根开盘在前根实体内部，收盘创新低", "hint": "阴→阴→阴（跳空下跌）", "key_features": "三根跳空阴线", "teaching": "强烈看跌"},
-    "红三线": {"meaning": "连续三根小阳线，走势温和", "hint": "阳→阳→阳（实体较小）", "key_features": "三根小阳线", "teaching": "温和上涨"},
-    "白三线": {"meaning": "连续三根阳线，收盘都在最高价附近", "hint": "阳→阳→阳（无上影）", "key_features": "三根光阳", "teaching": "强势持续"},
-    "上升楔形": {"meaning": "价格在两条收敛向上的趋势线之间运行", "hint": "价格高点抬高，但幅度越来越小", "key_features": "收敛向上楔形", "teaching": "可能向下突破"},
-    "下降楔形": {"meaning": "价格在两条收敛向下的趋势线之间运行", "hint": "价格低点降低，但幅度越来越小", "key_features": "收敛向下楔形", "teaching": "可能向上突破"},
-    "圆弧底": {"meaning": "价格缓慢下滑后缓慢回升，形成圆弧形", "hint": "底部平滑圆润，无明显尖角", "key_features": "圆弧形底部", "teaching": "缓慢筑底"},
-    "圆弧顶": {"meaning": "价格缓慢上升后缓慢回落，形成圆弧形", "hint": "顶部平滑圆润，无明显尖角", "key_features": "圆弧形顶部", "teaching": "缓慢筑顶"},
-    "V形反转": {"meaning": "价格急速下跌后急速反弹，形成V字", "hint": "底部尖锐，快速反转", "key_features": "V字形", "teaching": "急速反转信号"},
-    "岛形反转": {"meaning": "价格跳空后横盘几日，再次反向跳空", "hint": "两处跳空，中间孤岛", "key_features": "两个反向缺口", "teaching": "强烈反转信号"}
+    "两只乌鸦": {"meaning": "高位出现两根阴线", "hint": "阳→阴→阴", "key_features": "两阴夹一阳", "teaching": "高位见顶信号"},
+    "三只乌鸦": {"meaning": "连续三根阴线，收盘创新低", "hint": "阴→阴→阴（跳空）", "key_features": "三根跳空阴线", "teaching": "强烈看跌"},
+    "红三线": {"meaning": "连续三根小阳线，温和上涨", "hint": "阳→阳→阳（小实体）", "key_features": "三根小阳线", "teaching": "温和上涨"},
+    "白三线": {"meaning": "连续三根阳线，收盘都在最高附近", "hint": "阳→阳→阳（无上影）", "key_features": "三根光阳", "teaching": "强势持续"},
+    "上升楔形": {"meaning": "价格在收敛向上趋势线之间运行", "hint": "高点抬高，幅度变小", "key_features": "收敛向上", "teaching": "可能向下突破"},
+    "下降楔形": {"meaning": "价格在收敛向下趋势线之间运行", "hint": "低点降低，幅度变小", "key_features": "收敛向下", "teaching": "可能向上突破"},
+    "圆弧底": {"meaning": "价格缓慢下滑后缓慢回升", "hint": "底部平滑圆润", "key_features": "圆弧形底部", "teaching": "缓慢筑底"},
+    "圆弧顶": {"meaning": "价格缓慢上升后缓慢回落", "hint": "顶部平滑圆润", "key_features": "圆弧形顶部", "teaching": "缓慢筑顶"},
+    "V形反转": {"meaning": "急速下跌后急速反弹", "hint": "底部尖锐，快速反转", "key_features": "V字形", "teaching": "急速反转"},
+    "岛形反转": {"meaning": "跳空后横盘几日，再次反向跳空", "hint": "两处跳空，中间孤岛", "key_features": "两个反向缺口", "teaching": "强烈反转"}
 }
 PATTERN_NAMES = list(PATTERN_DATA.keys())
 
@@ -283,23 +282,17 @@ def record_mistake(module, question, user_answer, correct_answer, detail=""):
         "user_answer": user_answer, "correct_answer": correct_answer,
         "detail": detail, "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
-# ========== 仓位管理训练 ==========
 def tab_position():
     st.subheader("任务：给定场景，选择合理仓位")
     with st.expander("📖 仓位管理教学", expanded=False):
         st.markdown("""
-        ## 仓位管理是生存第一法则
-
         | 信号强度 | 建议仓位 |
         |---------|----------|
         | 强（多指标共振） | 5-7成 |
         | 中（部分信号） | 3-5成 |
         | 弱（信号矛盾） | 1-2成或观望 |
         | 大盘暴跌 | 0-1成 |
-
-        **永远不要满仓，留有余地应对意外。**
         """)
-
     if st.button("🎲 随机出题 (仓位)", use_container_width=True, key="btn_pos"):
         strength = random.choice(["强", "中", "弱"])
         market = random.choice(["大盘上涨", "大盘震荡", "大盘暴跌"])
@@ -318,13 +311,11 @@ def tab_position():
             "strength": strength, "market": market, "correct": correct, "options": options
         }
         st.session_state.q_pos_answered = False
-
     q = st.session_state.get("current_pos_q")
     if q:
         st.markdown(f"### 场景")
         st.markdown(f"- 信号强度：**{q['strength']}**")
         st.markdown(f"- 市场环境：**{q['market']}**")
-        st.markdown("### 你应该用多少仓位？")
         if not st.session_state.get("q_pos_answered"):
             cols = st.columns(4)
             for i, opt in enumerate(q["options"]):
@@ -351,23 +342,16 @@ def tab_position():
         rate = st.session_state.score_pos["correct"] / st.session_state.score_pos["total"] * 100
         st.sidebar.metric("仓位正确率", f"{rate:.1f}%")
 
-
-# ========== 大盘趋势判断 ==========
 def tab_market():
     st.subheader("任务：判断当前大盘处于什么状态")
     with st.expander("📖 大盘趋势教学", expanded=False):
         st.markdown("""
-        ## 大盘三状态
-
         | 状态 | 特征 | 建议仓位 |
         |------|------|----------|
         | 上涨 | 指数在MA20上方，量能放大 | 5-7成 |
         | 震荡 | 指数在MA20附近，量能平稳 | 3-5成 |
         | 下跌 | 指数在MA20下方，量能萎缩 | 0-2成 |
-
-        **大盘决定仓位，个股决定买卖。**
         """)
-
     if st.button("🎲 随机出题 (大盘)", use_container_width=True, key="btn_mkt"):
         df = fetch_daily("600519")
         if df is None or len(df) < 60:
@@ -388,7 +372,6 @@ def tab_market():
             "df": display, "correct": correct, "current": last, "ma20": ma20
         }
         st.session_state.q_mkt_answered = False
-
     q = st.session_state.get("current_mkt_q")
     if q:
         st.plotly_chart(plot_kline(q["df"], "大盘走势"), use_container_width=True)
@@ -418,26 +401,21 @@ def tab_market():
         rate = st.session_state.score_mkt["correct"] / st.session_state.score_mkt["total"] * 100
         st.sidebar.metric("大盘正确率", f"{rate:.1f}%")
 
-
-# ========== 模拟盘 ==========
 def tab_simulation():
     st.subheader("模拟盘交易")
     st.caption("用虚拟资金练习买卖，检验训练成果")
-
     if "sim_cash" not in st.session_state:
         st.session_state.sim_cash = 1000000.0
     if "sim_holdings" not in st.session_state:
         st.session_state.sim_holdings = {}
     if "sim_history" not in st.session_state:
         st.session_state.sim_history = []
-
     col1, col2 = st.columns(2)
     col1.metric("💰 现金", f"¥{st.session_state.sim_cash:,.2f}")
     total_value = st.session_state.sim_cash
     for sym, h in st.session_state.sim_holdings.items():
         total_value += h["shares"] * h["avg_price"]
     col2.metric("📊 总资产", f"¥{total_value:,.2f}")
-
     st.markdown("---")
     st.markdown("### 买入")
     c1, c2, c3 = st.columns(3)
@@ -451,7 +429,6 @@ def tab_simulation():
             buy_price = st.number_input("买入价", value=10.0, step=0.01, key="buy_p")
     with c3:
         buy_shares = st.number_input("股数（100的倍数）", value=100, step=100, key="buy_s")
-
     if st.button("🟢 买入", key="do_buy"):
         cost = buy_price * buy_shares
         if cost > st.session_state.sim_cash:
@@ -472,7 +449,6 @@ def tab_simulation():
             })
             st.success(f"✅ 买入 {buy_symbol} {buy_shares}股 @ {buy_price:.2f}")
             st.rerun()
-
     st.markdown("---")
     st.markdown("### 卖出")
     if st.session_state.sim_holdings:
@@ -484,7 +460,6 @@ def tab_simulation():
             sell_price = st.number_input("卖出价", value=float(h["avg_price"]), step=0.01, key="sell_p")
         with c3:
             sell_shares = st.number_input("股数", value=h["shares"], max_value=h["shares"], step=100, key="sell_s")
-
         if st.button("🔴 卖出", key="do_sell"):
             h = st.session_state.sim_holdings[sell_symbol]
             revenue = sell_price * sell_shares
@@ -501,7 +476,6 @@ def tab_simulation():
             })
             st.success(f"✅ 卖出 {sell_symbol} {sell_shares}股 @ {sell_price:.2f}，盈亏 {profit:+.2f}")
             st.rerun()
-
     st.markdown("---")
     st.markdown("### 当前持仓")
     if st.session_state.sim_holdings:
@@ -509,7 +483,6 @@ def tab_simulation():
             st.markdown(f"- **{sym}**：{h['shares']}股，成本 {h['avg_price']:.2f}")
     else:
         st.info("暂无持仓")
-
     st.markdown("### 交易记录")
     if st.session_state.sim_history:
         for r in reversed(st.session_state.sim_history[-20:]):
@@ -519,25 +492,20 @@ def tab_simulation():
                 st.markdown(f"🟢 {r['time']} 卖出 {r['symbol']} {r['shares']}股 @ {r['price']:.2f}，盈亏 {r['profit']:+.2f}")
     else:
         st.info("暂无记录")
-
     if st.button("重置模拟盘", key="reset_sim"):
         st.session_state.sim_cash = 1000000.0
         st.session_state.sim_holdings = {}
         st.session_state.sim_history = []
         st.rerun()
 
-
-# ========== 个股分析 ==========
 def tab_stock_analysis():
     st.subheader("📈 个股分析")
     st.caption("输入股票代码，系统自动给出综合分析和操作建议")
-
     col1, col2 = st.columns([2, 1])
     with col1:
         symbol_input = st.text_input("输入股票代码（6位数字）", value="600519")
     with col2:
         analyze_btn = st.button("开始分析", use_container_width=True)
-
     if analyze_btn:
         with st.spinner("正在分析..."):
             df = fetch_daily(symbol_input)
@@ -546,29 +514,24 @@ def tab_stock_analysis():
                 return
             ind = calculate_all_indicators(df, len(df) - 1)
             st.session_state.analysis_result = {"df": df, "symbol": symbol_input, "ind": ind}
-
     result = st.session_state.get("analysis_result")
     if result:
         df = result["df"]
         ind = result["ind"]
         symbol = result["symbol"]
-
         st.plotly_chart(plot_kline(df.tail(60), f"{symbol} 近60日K线"), use_container_width=True)
-
         st.markdown("### 📊 基础数据")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("当前价", f"{ind['last_close']:.2f}", delta=f"{ind['pct_change']:.2f}%")
         c2.metric("MA5", f"{ind['ma5']:.2f}")
         c3.metric("MA20", f"{ind['ma20']:.2f}")
         c4.metric("MA60", f"{ind['ma60']:.2f}")
-
         st.markdown("### 📈 技术指标")
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("均线排列", ind['ma_alignment'])
         c2.metric("MACD", ind['macd_status'], delta=ind['macd_cross'])
         c3.metric("RSI", f"{ind['rsi']:.1f}", delta=ind['rsi_status'])
         c4.metric("量价", ind['vol_price_status'])
-
         st.markdown("### 🎯 综合评分")
         score = 0
         details = []
@@ -592,11 +555,9 @@ def tab_stock_analysis():
             score += 1; details.append("+1 RSI超卖")
         elif ind['rsi'] > 70:
             score -= 1; details.append("-1 RSI超买")
-
         for d in details:
             st.markdown(f"- {d}")
         st.markdown(f"**总分：{score:+d}**")
-
         st.markdown("### 💡 操作建议")
         if score >= 3:
             st.success("🔵 **强烈看多** — 多信号共振，可以考虑买入")
@@ -608,7 +569,6 @@ def tab_stock_analysis():
             st.warning("🟡 **偏空** — 谨慎操作，控制仓位")
         else:
             st.info("⚪ **中性** — 方向不明，建议观望")
-
         st.markdown("### 🛡️ 止损位建议")
         high, low = df["high"], df["low"]
         prev_close = df["close"].shift(1)
@@ -619,8 +579,6 @@ def tab_stock_analysis():
         st.markdown(f"- ATR：**{atr:.2f}**")
         st.markdown(f"- 合理止损区间：**{stop_low:.2f} ~ {stop_high:.2f}**")
         st.markdown(f"- 建议止损价：**{stop_high:.2f}**（较保守）或 **{stop_low:.2f}**（较宽松）")
-
-# ========== 主程序 ==========
 def main():
     init_mistakes()
     st.sidebar.header("📊 我的成绩")
@@ -639,7 +597,7 @@ def main():
         if key not in st.session_state:
             st.session_state[key] = None
 
-       tabs = st.tabs([
+    tabs = st.tabs([
         "📊 形态", "⚡ 分时", "🏭 板块", "🎯 买卖点",
         "🛡️ 止损", "🔮 趋势", "💰 仓位", "🌍 大盘",
         "💼 模拟盘", "📝 错题本", "📈 个股分析"
@@ -656,7 +614,6 @@ def main():
             """)
             for name, data in PATTERN_DATA.items():
                 st.markdown(f"**{name}**：{data['meaning']} | 实战：{data['teaching']}")
-
         if st.button("🎲 随机出题 (形态)", use_container_width=True, key="btn_pattern"):
             with st.spinner("加载..."):
                 random.shuffle(STOCK_POOL)
@@ -675,7 +632,6 @@ def main():
                         }
                         st.session_state.q_pattern_answered = False
                         break
-
         q = st.session_state.current_pattern_q
         if q:
             st.plotly_chart(plot_kline(q["df"], f"{q['name']} 日K线"), use_container_width=True)
@@ -990,7 +946,6 @@ def main():
                     st.session_state.current_trend_q = None
                     st.session_state.q_trend_answered = False
                     st.rerun()
-
     with tab7:
         tab_position()
 
@@ -1016,14 +971,13 @@ def main():
                 with st.expander(f"[{m['module']}] {m['question']} - {m['time']}"):
                     st.markdown(f"- 你选：{m['user_answer']}")
                     st.markdown(f"- 正确：{m['correct_answer']}")
-                        if st.button("清空错题本"):
+            if st.button("清空错题本"):
                 st.session_state.mistakes = []
                 st.rerun()
 
     with tab11:
         tab_stock_analysis()
 
-    # 侧边栏成绩
     for name, key in [("形态", "score_pattern"), ("分时", "score_intra"),
                       ("板块", "score_industry"), ("买卖点", "score_trade"),
                       ("止损", "score_stop"), ("趋势", "score_trend"),
@@ -1031,7 +985,6 @@ def main():
         if st.session_state[key]["total"] > 0:
             rate = st.session_state[key]["correct"] / st.session_state[key]["total"] * 100
             st.sidebar.metric(f"{name}正确率", f"{rate:.1f}%")
-
 
 if __name__ == "__main__":
     main()
