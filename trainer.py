@@ -6,12 +6,9 @@ import requests
 from datetime import datetime, timedelta
 import numpy as np
 
-# ============================================================
-# 页面配置
-# ============================================================
 st.set_page_config(page_title="K线训练器", layout="wide")
 st.title("⚔️ K线综合训练器")
-st.caption("形态识别 | 分时实战 | 板块认知 | 买卖点 | 止损训练 | 未来趋势 | 错题本")
+st.caption("形态 | 分时 | 板块 | 买卖点 | 止损 | 未来趋势 | 仓位 | 大盘 | 模拟盘 | 错题本")
 
 API_KEY = st.secrets["TONGHUASHUN_API_KEY"]
 
@@ -32,9 +29,6 @@ INDUSTRY_MAP = {
 }
 ALL_INDUSTRIES = list(set(INDUSTRY_MAP.values()))
 
-# ============================================================
-# 1. 获取日线数据
-# ============================================================
 def fetch_daily(symbol):
     if symbol.startswith("60") or symbol.startswith("68"):
         code = symbol + ".SH"
@@ -68,9 +62,6 @@ def fetch_daily(symbol):
     except Exception:
         return None
 
-# ============================================================
-# 2. 分时数据生成
-# ============================================================
 def generate_intraday_from_multiple_days(daily_df, num_days=7, bars_per_day=48):
     if len(daily_df) < num_days:
         return None
@@ -127,12 +118,10 @@ def generate_intraday_from_multiple_days(daily_df, num_days=7, bars_per_day=48):
         "low": all_lows, "close": all_closes, "volume": all_volumes
     })
 
-# ============================================================
-# 3. 形态题库
-# ============================================================
+# ===== 30种形态 =====
 PATTERN_DATA = {
-    "大阳线": {"meaning": "收盘远高于开盘，实体很长，买方极强", "hint": "实体很长（>3%涨幅），几乎没有上下影线", "key_features": "实体很长，上下影线很短", "teaching": "出现在低位是反转信号，出现在高位是强势延续"},
-    "大阴线": {"meaning": "收盘远低于开盘，实体很长，卖方极强", "hint": "实体很长（>3%跌幅），几乎没有上下影线", "key_features": "实体很长，上下影线很短", "teaching": "出现在高位是见顶信号，出现在低位是恐慌杀跌"},
+    "大阳线": {"meaning": "收盘远高于开盘，实体很长，买方极强", "hint": "实体很长（>3%涨幅），几乎没有上下影线", "key_features": "实体很长，上下影线很短", "teaching": "低位反转，高位延续"},
+    "大阴线": {"meaning": "收盘远低于开盘，实体很长，卖方极强", "hint": "实体很长（>3%跌幅），几乎没有上下影线", "key_features": "实体很长，上下影线很短", "teaching": "高位见顶，低位杀跌"},
     "十字星": {"meaning": "开盘收盘几乎相等，多空胶着", "hint": "实体极小，上下影线明显", "key_features": "实体极小", "teaching": "高位见顶，低位见底"},
     "T字线": {"meaning": "开盘=收盘，长下影线，下方支撑强", "hint": "长下影线，无上影线", "key_features": "开盘=收盘，长下影线", "teaching": "下跌末端出现，可能止跌"},
     "看涨吞没": {"meaning": "下跌末端，大阳线完全包住前阴线，看涨", "hint": "阴线→大阳线，阳线实体覆盖阴线", "key_features": "阳线覆盖阴线", "teaching": "多头完全压倒空头"},
@@ -150,13 +139,20 @@ PATTERN_DATA = {
     "倒锤子线": {"meaning": "下跌末端，长上影小实体，看涨", "hint": "长上影，小实体", "key_features": "长上影+小实体", "teaching": "多头试探性反攻"},
     "平底": {"meaning": "多根K线最低点相同，水平支撑，看涨", "hint": "多个最低价接近相同", "key_features": "相同低点", "teaching": "支撑位确认"},
     "平顶": {"meaning": "多根K线最高点相同，水平压力，看跌", "hint": "多个最高价接近相同", "key_features": "相同高点", "teaching": "压力位确认"},
-    "身怀六甲": {"meaning": "大K线内包小K线，趋势可能反转", "hint": "大实体→小实体", "key_features": "大包小", "teaching": "动能衰竭"}
+    "身怀六甲": {"meaning": "大K线内包小K线，趋势可能反转", "hint": "大实体→小实体", "key_features": "大包小", "teaching": "动能衰竭"},
+    "两只乌鸦": {"meaning": "高位出现两根阴线，第一根长，第二根小且跳空高开", "hint": "阳→阴→阴（第二根跳空）", "key_features": "两阴夹一阳的变形", "teaching": "高位见顶信号"},
+    "三只乌鸦": {"meaning": "连续三根阴线，每根开盘在前根实体内部，收盘创新低", "hint": "阴→阴→阴（跳空下跌）", "key_features": "三根跳空阴线", "teaching": "强烈看跌"},
+    "红三线": {"meaning": "连续三根小阳线，走势温和", "hint": "阳→阳→阳（实体较小）", "key_features": "三根小阳线", "teaching": "温和上涨"},
+    "白三线": {"meaning": "连续三根阳线，收盘都在最高价附近", "hint": "阳→阳→阳（无上影）", "key_features": "三根光阳", "teaching": "强势持续"},
+    "上升楔形": {"meaning": "价格在两条收敛向上的趋势线之间运行", "hint": "价格高点抬高，但幅度越来越小", "key_features": "收敛向上楔形", "teaching": "可能向下突破"},
+    "下降楔形": {"meaning": "价格在两条收敛向下的趋势线之间运行", "hint": "价格低点降低，但幅度越来越小", "key_features": "收敛向下楔形", "teaching": "可能向上突破"},
+    "圆弧底": {"meaning": "价格缓慢下滑后缓慢回升，形成圆弧形", "hint": "底部平滑圆润，无明显尖角", "key_features": "圆弧形底部", "teaching": "缓慢筑底"},
+    "圆弧顶": {"meaning": "价格缓慢上升后缓慢回落，形成圆弧形", "hint": "顶部平滑圆润，无明显尖角", "key_features": "圆弧形顶部", "teaching": "缓慢筑顶"},
+    "V形反转": {"meaning": "价格急速下跌后急速反弹，形成V字", "hint": "底部尖锐，快速反转", "key_features": "V字形", "teaching": "急速反转信号"},
+    "岛形反转": {"meaning": "价格跳空后横盘几日，再次反向跳空", "hint": "两处跳空，中间孤岛", "key_features": "两个反向缺口", "teaching": "强烈反转信号"}
 }
 PATTERN_NAMES = list(PATTERN_DATA.keys())
 
-# ============================================================
-# 4. 绘图函数
-# ============================================================
 def plot_kline(df, title, is_intraday=False):
     if is_intraday:
         x_vals = df["time"].tolist()
@@ -183,33 +179,25 @@ def plot_kline(df, title, is_intraday=False):
         fig.update_layout(title=title, height=450, template="plotly_dark", xaxis_rangeslider_visible=False)
     return fig
 
-# ============================================================
-# 5. 指标计算
-# ============================================================
 def calculate_all_indicators(df, current_idx):
     slice_df = df.iloc[:current_idx+1].copy()
     last = slice_df.iloc[-1]
-
     ma5 = slice_df["close"].rolling(5).mean().iloc[-1] if len(slice_df) >= 5 else last["close"]
     ma10 = slice_df["close"].rolling(10).mean().iloc[-1] if len(slice_df) >= 10 else ma5
     ma20 = slice_df["close"].rolling(20).mean().iloc[-1] if len(slice_df) >= 20 else ma5
     ma60 = slice_df["close"].rolling(60).mean().iloc[-1] if len(slice_df) >= 60 else ma20
-
     avg_prices = (slice_df["open"] + slice_df["high"] + slice_df["low"] + slice_df["close"]) / 4
     cum_amount = (avg_prices * slice_df["volume"]).cumsum()
     cum_volume = slice_df["volume"].cumsum()
     current_avg_price = (cum_amount / cum_volume).iloc[-1]
-
     if last["close"] > current_avg_price * 1.002:
         avg_position = "高于均价线 (偏强)"
     elif last["close"] < current_avg_price * 0.998:
         avg_position = "低于均价线 (偏弱)"
     else:
         avg_position = "接近均价线 (中性)"
-
     vol_avg = slice_df["volume"].iloc[-6:-1].mean() if len(slice_df) >= 6 else slice_df["volume"].mean()
     vol_ratio = last["volume"] / vol_avg if vol_avg > 0 else 1
-
     if len(slice_df) >= 30:
         exp1 = slice_df["close"].ewm(span=12, adjust=False).mean()
         exp2 = slice_df["close"].ewm(span=26, adjust=False).mean()
@@ -228,7 +216,6 @@ def calculate_all_indicators(df, current_idx):
             macd_cross = "无交叉"
     else:
         macd_status, macd_hist_value, macd_cross = "数据不足", 0, "数据不足"
-
     if len(slice_df) >= 15:
         delta = slice_df["close"].diff()
         gain = (delta.where(delta > 0, 0)).rolling(14).mean()
@@ -238,14 +225,12 @@ def calculate_all_indicators(df, current_idx):
         rsi_status = "超买区" if rsi > 70 else "超卖区" if rsi < 30 else "中性"
     else:
         rsi, rsi_status = 50, "数据不足"
-
     if last["close"] > ma5 * 1.005:
         price_position = "高于MA5 (偏强)"
     elif last["close"] < ma5 * 0.995:
         price_position = "低于MA5 (偏弱)"
     else:
         price_position = "接近MA5 (中性)"
-
     if len(slice_df) >= 2:
         prev_close = slice_df["close"].iloc[-2]
         if vol_ratio > 1.5:
@@ -256,23 +241,19 @@ def calculate_all_indicators(df, current_idx):
             vol_price_status = "量价正常"
     else:
         vol_price_status = "数据不足"
-
     if len(slice_df) >= 3:
         recent_3 = slice_df["close"].iloc[-3:]
         short_trend = "上涨" if recent_3.iloc[-1] > recent_3.iloc[0] else "下跌"
     else:
         short_trend = "震荡"
-
     if last["close"] > ma5 and ma5 > ma20:
         ma_alignment = "多头排列（强势）"
     elif last["close"] < ma5 and ma5 < ma20:
         ma_alignment = "空头排列（弱势）"
     else:
         ma_alignment = "均线交织（震荡）"
-
     first_open = slice_df["open"].iloc[0]
     pct_change = (last["close"] - first_open) / first_open * 100
-
     return {
         "last_close": last["close"],
         "ma5": ma5, "ma10": ma10, "ma20": ma20, "ma60": ma60,
@@ -292,9 +273,6 @@ def calculate_all_indicators(df, current_idx):
         "last_volume": last["volume"], "vol_avg": vol_avg
     }
 
-# ============================================================
-# 6. 错题本
-# ============================================================
 def init_mistakes():
     if "mistakes" not in st.session_state:
         st.session_state.mistakes = []
@@ -305,49 +283,289 @@ def record_mistake(module, question, user_answer, correct_answer, detail=""):
         "user_answer": user_answer, "correct_answer": correct_answer,
         "detail": detail, "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
+# ========== 仓位管理训练 ==========
+def tab_position():
+    st.subheader("任务：给定场景，选择合理仓位")
+    with st.expander("📖 仓位管理教学", expanded=False):
+        st.markdown("""
+        ## 仓位管理是生存第一法则
 
-# ============================================================
-# 7. 主程序
-# ============================================================
+        | 信号强度 | 建议仓位 |
+        |---------|----------|
+        | 强（多指标共振） | 5-7成 |
+        | 中（部分信号） | 3-5成 |
+        | 弱（信号矛盾） | 1-2成或观望 |
+        | 大盘暴跌 | 0-1成 |
+
+        **永远不要满仓，留有余地应对意外。**
+        """)
+
+    if st.button("🎲 随机出题 (仓位)", use_container_width=True, key="btn_pos"):
+        strength = random.choice(["强", "中", "弱"])
+        market = random.choice(["大盘上涨", "大盘震荡", "大盘暴跌"])
+        if market == "大盘暴跌":
+            correct = "0-1成"
+        elif strength == "强" and market == "大盘上涨":
+            correct = "5-7成"
+        elif strength == "强":
+            correct = "3-5成"
+        elif strength == "中":
+            correct = "3-5成"
+        else:
+            correct = "1-2成"
+        options = ["0-1成", "1-2成", "3-5成", "5-7成"]
+        st.session_state.current_pos_q = {
+            "strength": strength, "market": market, "correct": correct, "options": options
+        }
+        st.session_state.q_pos_answered = False
+
+    q = st.session_state.get("current_pos_q")
+    if q:
+        st.markdown(f"### 场景")
+        st.markdown(f"- 信号强度：**{q['strength']}**")
+        st.markdown(f"- 市场环境：**{q['market']}**")
+        st.markdown("### 你应该用多少仓位？")
+        if not st.session_state.get("q_pos_answered"):
+            cols = st.columns(4)
+            for i, opt in enumerate(q["options"]):
+                with cols[i]:
+                    if st.button(opt, key=f"pos_{i}"):
+                        st.session_state.q_pos_answered = True
+                        st.session_state.score_pos["total"] += 1
+                        if opt == q["correct"]:
+                            st.session_state.score_pos["correct"] += 1
+                        st.session_state.pos_user_choice = opt
+                        st.rerun()
+        if st.session_state.get("q_pos_answered"):
+            uc = st.session_state.pos_user_choice
+            if uc == q["correct"]:
+                st.success(f"✅ 正确！建议仓位 {q['correct']}")
+            else:
+                st.error(f"❌ 错误。正确仓位是 {q['correct']}，你选了 {uc}")
+            st.markdown(f"**逻辑**：信号{q['strength']} + {q['market']} → {q['correct']}")
+            if st.button("继续下一题 (仓位)"):
+                st.session_state.current_pos_q = None
+                st.session_state.q_pos_answered = False
+                st.rerun()
+    if st.session_state.score_pos["total"] > 0:
+        rate = st.session_state.score_pos["correct"] / st.session_state.score_pos["total"] * 100
+        st.sidebar.metric("仓位正确率", f"{rate:.1f}%")
+
+
+# ========== 大盘趋势判断 ==========
+def tab_market():
+    st.subheader("任务：判断当前大盘处于什么状态")
+    with st.expander("📖 大盘趋势教学", expanded=False):
+        st.markdown("""
+        ## 大盘三状态
+
+        | 状态 | 特征 | 建议仓位 |
+        |------|------|----------|
+        | 上涨 | 指数在MA20上方，量能放大 | 5-7成 |
+        | 震荡 | 指数在MA20附近，量能平稳 | 3-5成 |
+        | 下跌 | 指数在MA20下方，量能萎缩 | 0-2成 |
+
+        **大盘决定仓位，个股决定买卖。**
+        """)
+
+    if st.button("🎲 随机出题 (大盘)", use_container_width=True, key="btn_mkt"):
+        df = fetch_daily("600519")
+        if df is None or len(df) < 60:
+            st.error("数据加载失败")
+            return
+        cut = random.randint(40, len(df) - 5)
+        display = df.iloc[:cut].copy()
+        ma20 = display["close"].rolling(20).mean().iloc[-1]
+        last = display.iloc[-1]["close"]
+        vol_ratio = display["volume"].iloc[-1] / display["volume"].iloc[-6:-1].mean()
+        if last > ma20 * 1.02 and vol_ratio > 1.2:
+            correct = "上涨"
+        elif last < ma20 * 0.98:
+            correct = "下跌"
+        else:
+            correct = "震荡"
+        st.session_state.current_mkt_q = {
+            "df": display, "correct": correct, "current": last, "ma20": ma20
+        }
+        st.session_state.q_mkt_answered = False
+
+    q = st.session_state.get("current_mkt_q")
+    if q:
+        st.plotly_chart(plot_kline(q["df"], "大盘走势"), use_container_width=True)
+        st.markdown(f"当前价：{q['current']:.2f}，MA20：{q['ma20']:.2f}")
+        if not st.session_state.get("q_mkt_answered"):
+            cols = st.columns(3)
+            for i, opt in enumerate(["上涨", "震荡", "下跌"]):
+                with cols[i]:
+                    if st.button(opt, key=f"mkt_{i}"):
+                        st.session_state.q_mkt_answered = True
+                        st.session_state.score_mkt["total"] += 1
+                        if opt == q["correct"]:
+                            st.session_state.score_mkt["correct"] += 1
+                        st.session_state.mkt_user_choice = opt
+                        st.rerun()
+        if st.session_state.get("q_mkt_answered"):
+            uc = st.session_state.mkt_user_choice
+            if uc == q["correct"]:
+                st.success(f"✅ 正确！当前大盘：{q['correct']}")
+            else:
+                st.error(f"❌ 错误。正确是 {q['correct']}，你选了 {uc}")
+            if st.button("继续下一题 (大盘)"):
+                st.session_state.current_mkt_q = None
+                st.session_state.q_mkt_answered = False
+                st.rerun()
+    if st.session_state.score_mkt["total"] > 0:
+        rate = st.session_state.score_mkt["correct"] / st.session_state.score_mkt["total"] * 100
+        st.sidebar.metric("大盘正确率", f"{rate:.1f}%")
+
+
+# ========== 模拟盘 ==========
+def tab_simulation():
+    st.subheader("模拟盘交易")
+    st.caption("用虚拟资金练习买卖，检验训练成果")
+
+    if "sim_cash" not in st.session_state:
+        st.session_state.sim_cash = 1000000.0
+    if "sim_holdings" not in st.session_state:
+        st.session_state.sim_holdings = {}
+    if "sim_history" not in st.session_state:
+        st.session_state.sim_history = []
+
+    col1, col2 = st.columns(2)
+    col1.metric("💰 现金", f"¥{st.session_state.sim_cash:,.2f}")
+    total_value = st.session_state.sim_cash
+    for sym, h in st.session_state.sim_holdings.items():
+        total_value += h["shares"] * h["avg_price"]
+    col2.metric("📊 总资产", f"¥{total_value:,.2f}")
+
+    st.markdown("---")
+    st.markdown("### 买入")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        buy_symbol = st.selectbox("选择股票", STOCK_POOL, key="buy_sym")
+    with c2:
+        df = fetch_daily(buy_symbol)
+        if df is not None:
+            buy_price = st.number_input("买入价", value=float(df.iloc[-1]["close"]), step=0.01, key="buy_p")
+        else:
+            buy_price = st.number_input("买入价", value=10.0, step=0.01, key="buy_p")
+    with c3:
+        buy_shares = st.number_input("股数（100的倍数）", value=100, step=100, key="buy_s")
+
+    if st.button("🟢 买入", key="do_buy"):
+        cost = buy_price * buy_shares
+        if cost > st.session_state.sim_cash:
+            st.error("❌ 资金不足")
+        else:
+            st.session_state.sim_cash -= cost
+            if buy_symbol in st.session_state.sim_holdings:
+                h = st.session_state.sim_holdings[buy_symbol]
+                total_shares = h["shares"] + buy_shares
+                h["avg_price"] = (h["shares"] * h["avg_price"] + cost) / total_shares
+                h["shares"] = total_shares
+            else:
+                st.session_state.sim_holdings[buy_symbol] = {"shares": buy_shares, "avg_price": buy_price}
+            st.session_state.sim_history.append({
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "action": "买入", "symbol": buy_symbol,
+                "price": buy_price, "shares": buy_shares
+            })
+            st.success(f"✅ 买入 {buy_symbol} {buy_shares}股 @ {buy_price:.2f}")
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 卖出")
+    if st.session_state.sim_holdings:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            sell_symbol = st.selectbox("选择股票", list(st.session_state.sim_holdings.keys()), key="sell_sym")
+        with c2:
+            h = st.session_state.sim_holdings[sell_symbol]
+            sell_price = st.number_input("卖出价", value=float(h["avg_price"]), step=0.01, key="sell_p")
+        with c3:
+            sell_shares = st.number_input("股数", value=h["shares"], max_value=h["shares"], step=100, key="sell_s")
+
+        if st.button("🔴 卖出", key="do_sell"):
+            h = st.session_state.sim_holdings[sell_symbol]
+            revenue = sell_price * sell_shares
+            profit = (sell_price - h["avg_price"]) * sell_shares
+            st.session_state.sim_cash += revenue
+            if sell_shares >= h["shares"]:
+                del st.session_state.sim_holdings[sell_symbol]
+            else:
+                h["shares"] -= sell_shares
+            st.session_state.sim_history.append({
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "action": "卖出", "symbol": sell_symbol,
+                "price": sell_price, "shares": sell_shares, "profit": profit
+            })
+            st.success(f"✅ 卖出 {sell_symbol} {sell_shares}股 @ {sell_price:.2f}，盈亏 {profit:+.2f}")
+            st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 当前持仓")
+    if st.session_state.sim_holdings:
+        for sym, h in st.session_state.sim_holdings.items():
+            st.markdown(f"- **{sym}**：{h['shares']}股，成本 {h['avg_price']:.2f}")
+    else:
+        st.info("暂无持仓")
+
+    st.markdown("### 交易记录")
+    if st.session_state.sim_history:
+        for r in reversed(st.session_state.sim_history[-20:]):
+            if r["action"] == "买入":
+                st.markdown(f"🔴 {r['time']} 买入 {r['symbol']} {r['shares']}股 @ {r['price']:.2f}")
+            else:
+                st.markdown(f"🟢 {r['time']} 卖出 {r['symbol']} {r['shares']}股 @ {r['price']:.2f}，盈亏 {r['profit']:+.2f}")
+    else:
+        st.info("暂无记录")
+
+    if st.button("重置模拟盘", key="reset_sim"):
+        st.session_state.sim_cash = 1000000.0
+        st.session_state.sim_holdings = {}
+        st.session_state.sim_history = []
+        st.rerun()
+
+
+# ========== 主程序 ==========
 def main():
     init_mistakes()
     st.sidebar.header("📊 我的成绩")
-    for key in ["score_pattern", "score_intra", "score_industry", "score_trade", "score_stop", "score_trend"]:
+    for key in ["score_pattern", "score_intra", "score_industry", "score_trade",
+                "score_stop", "score_trend", "score_pos", "score_mkt"]:
         if key not in st.session_state:
             st.session_state[key] = {"correct": 0, "total": 0}
     for key in ["q_pattern_answered", "q_intra_answered", "q_industry_answered",
-                "q_trade_answered", "q_stop_answered", "q_trend_answered"]:
+                "q_trade_answered", "q_stop_answered", "q_trend_answered",
+                "q_pos_answered", "q_mkt_answered"]:
         if key not in st.session_state:
             st.session_state[key] = False
     for key in ["current_pattern_q", "current_intra_q", "current_industry_q",
-                "current_trade_q", "current_stop_q", "current_trend_q"]:
+                "current_trade_q", "current_stop_q", "current_trend_q",
+                "current_pos_q", "current_mkt_q"]:
         if key not in st.session_state:
             st.session_state[key] = None
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-        "📊 形态识别", "⚡ 分时实战", "🏭 板块认知",
-        "🎯 买卖点", "🛡️ 止损训练", "🔮 未来趋势", "📝 错题本"
+    tabs = st.tabs([
+        "📊 形态", "⚡ 分时", "🏭 板块", "🎯 买卖点",
+        "🛡️ 止损", "🔮 趋势", "💰 仓位", "🌍 大盘",
+        "💼 模拟盘", "📝 错题本"
     ])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = tabs
 
-    # ========== 标签1：形态识别 ==========
     with tab1:
-        st.subheader("任务：看K线，选形态名称（共20种）")
+        st.subheader(f"任务：看K线，选形态名称（共{len(PATTERN_NAMES)}种）")
         with st.expander("📖 形态识别教学", expanded=False):
             st.markdown("""
-            ## 怎么看K线？
             - **实体长度**：越长越强（大阳线=买方强，大阴线=卖方强）
             - **影线长度**：越长越有含义（长下影=下方支撑，长上影=上方压力）
             - **出现位置**：高位看跌，低位看涨
-            - **组合关系**：吞没=反转，连续=趋势
             """)
             for name, data in PATTERN_DATA.items():
-                st.markdown(f"**{name}**：{data['meaning']}")
-                st.markdown(f"- 特征：{data['key_features']}")
-                st.markdown(f"- 实战：{data['teaching']}")
-                st.markdown("---")
+                st.markdown(f"**{name}**：{data['meaning']} | 实战：{data['teaching']}")
 
         if st.button("🎲 随机出题 (形态)", use_container_width=True, key="btn_pattern"):
-            with st.spinner("加载数据..."):
+            with st.spinner("加载..."):
                 random.shuffle(STOCK_POOL)
                 for symbol in STOCK_POOL:
                     df = fetch_daily(symbol)
@@ -383,39 +601,21 @@ def main():
             if st.session_state.q_pattern_answered:
                 uc = st.session_state.pat_user_choice
                 if uc == q["correct"]:
-                    st.success(f"✅ 正确！{q['correct']}")
-                    st.markdown(f"**📖 解释**：{q['meaning']}")
-                    st.markdown(f"**📘 实战**：{q['teaching']}")
+                    st.success(f"✅ 正确！{q['correct']}：{q['meaning']}")
                 else:
                     st.error(f"❌ 错误。正确答案是 {q['correct']}")
                     st.markdown(f"**你选的 {uc}**：{PATTERN_DATA[uc]['meaning']}")
                     st.markdown(f"**正确答案 {q['correct']}**：{q['meaning']}")
-                    st.markdown(f"🔍 关键区别：{PATTERN_DATA[uc]['hint']} vs {q['hint']}")
-                    record_mistake("形态识别", f"{q['name']} 形态", uc, q['correct'])
+                    record_mistake("形态", f"{q['name']}", uc, q['correct'])
                 if st.button("继续下一题 (形态)"):
                     st.session_state.current_pattern_q = None
                     st.session_state.q_pattern_answered = False
                     st.rerun()
-        if st.session_state.score_pattern["total"] > 0:
-            rate = st.session_state.score_pattern["correct"] / st.session_state.score_pattern["total"] * 100
-            st.sidebar.metric("形态正确率", f"{rate:.1f}%")
 
-    # ========== 标签2：分时实战 ==========
     with tab2:
         st.subheader("任务：看分时图，判断下一根K线涨跌")
-        with st.expander("📖 分时实战教学", expanded=False):
-            st.markdown("""
-            ## 三因子评分法
-            | 因子 | 看多 | 看空 |
-            |------|------|------|
-            | 趋势 | 价格 > MA5 | 价格 < MA5 |
-            | 量能 | 放量上涨 | 放量下跌 |
-            | 动能 | MACD多头增强 | MACD空头增强 |
-            **总分≥2 → 偏多，总分≤-2 → 偏空，中间 → 观望**
-            """)
-
         if st.button("🎲 随机出题 (分时)", use_container_width=True, key="btn_intra"):
-            with st.spinner("生成数据..."):
+            with st.spinner("生成..."):
                 random.shuffle(STOCK_POOL)
                 for symbol in STOCK_POOL:
                     df_daily = fetch_daily(symbol)
@@ -424,7 +624,6 @@ def main():
                         if df_intra is None or len(df_intra) < 150:
                             continue
                         total_len = len(df_intra)
-                        # 保证 cut_end >= 100，确保切片有数据
                         cut_end = random.randint(100, total_len - 5)
                         display_df = df_intra.iloc[cut_end-100:cut_end].copy().reset_index(drop=True)
                         if len(display_df) < 100:
@@ -439,28 +638,17 @@ def main():
                         }
                         st.session_state.q_intra_answered = False
                         break
-
         q = st.session_state.current_intra_q
         if q:
             ind = q["indicators"]
-            fig = plot_kline(q["df"], f"{q['symbol']} 分时图", is_intraday=True)
+            fig = plot_kline(q["df"], f"{q['symbol']} 分时", is_intraday=True)
             fig.add_vline(x=q['df']['time'].iloc[-1], line_width=2, line_dash="dash", line_color="yellow")
             st.plotly_chart(fig, use_container_width=True)
-
-            st.markdown("### 📊 指标面板")
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("当前价", f"{ind['last_close']:.2f}")
-            c1.caption(f"MA5: {ind['ma5']:.2f} ({ind['price_position']})")
             c2.metric("量比", f"{ind['vol_ratio']:.2f}", delta=ind['vol_status'])
-            c2.caption(ind['vol_price_status'])
             c3.metric("RSI", f"{ind['rsi']:.1f}", delta=ind['rsi_status'])
-            c4.metric("MACD柱", f"{ind['macd_hist_value']:.3f}", delta=ind['macd_status'])
-
-            score_trend = 1 if "高于" in ind['price_position'] else -1 if "低于" in ind['price_position'] else 0
-            score_volume = 1 if ind['vol_price_status'] == "放量上涨（强势）" else -1 if ind['vol_price_status'] == "放量下跌（弱势）" else 0
-            score_macd = 1 if ind['macd_status'] == "多头增强" else -1 if ind['macd_status'] == "空头增强" else 0
-            total_score = score_trend + score_volume + score_macd
-
+            c4.metric("MACD", f"{ind['macd_hist_value']:.3f}", delta=ind['macd_status'])
             if not st.session_state.q_intra_answered:
                 c1, c2 = st.columns(2)
                 if c1.button("📈 涨", key="intra_up"):
@@ -477,38 +665,24 @@ def main():
                     if q["actual_direction"] == "跌":
                         st.session_state.score_intra["correct"] += 1
                     st.rerun()
-
             if st.session_state.q_intra_answered:
                 uc = st.session_state.intra_user_choice
-                actual = q["actual_direction"]
-                if uc == actual:
-                    st.success(f"✅ 正确！实际为 {actual}")
+                if uc == q["actual_direction"]:
+                    st.success(f"✅ 正确！实际 {q['actual_direction']}")
                 else:
-                    st.error(f"❌ 错误。你选 {uc}，实际为 {actual}")
-                    record_mistake("分时实战", f"{q['symbol']} 分时", uc, actual)
-                st.markdown("### 📖 详细复盘")
-                st.markdown(f"- 价格 vs MA5：**{ind['price_position']}**")
-                st.markdown(f"- 价格 vs 均价线：**{ind['avg_position']}**")
-                st.markdown(f"- 量价：**{ind['vol_price_status']}**")
-                st.markdown(f"- MACD：**{ind['macd_status']}** ({ind['macd_cross']})")
-                st.markdown(f"- RSI：**{ind['rsi']:.1f}** ({ind['rsi_status']})")
-                st.markdown(f"- **三因子总分：{total_score:+d}**")
+                    st.error(f"❌ 错误。实际 {q['actual_direction']}")
+                    record_mistake("分时", q['symbol'], uc, q['actual_direction'])
+                st.markdown(f"- MA5：{ind['price_position']}")
+                st.markdown(f"- 均价线：{ind['avg_position']}")
+                st.markdown(f"- 量价：{ind['vol_price_status']}")
+                st.markdown(f"- MACD：{ind['macd_status']} ({ind['macd_cross']})")
                 if st.button("继续下一题 (分时)"):
                     st.session_state.current_intra_q = None
                     st.session_state.q_intra_answered = False
                     st.rerun()
-        if st.session_state.score_intra["total"] > 0:
-            rate = st.session_state.score_intra["correct"] / st.session_state.score_intra["total"] * 100
-            st.sidebar.metric("分时正确率", f"{rate:.1f}%")
 
-    # ========== 标签3：板块认知 ==========
     with tab3:
         st.subheader("任务：看股票代码，选所属行业")
-        with st.expander("📖 板块认知教学", expanded=False):
-            st.markdown("""
-            A股是**板块联动**的市场，同板块股票往往同涨同跌。
-            看到代码就要条件反射出行业，这是短线基本功。
-            """)
         if st.button("🎲 随机出题 (板块)", use_container_width=True, key="btn_industry"):
             symbol = random.choice(list(INDUSTRY_MAP.keys()))
             correct = INDUSTRY_MAP[symbol]
@@ -517,11 +691,9 @@ def main():
             st.session_state.current_industry_q = {"symbol": symbol, "correct": correct, "options": options}
             st.session_state.q_industry_answered = False
             st.rerun()
-
         q = st.session_state.current_industry_q
         if q:
-            st.markdown(f"### 股票代码：**{q['symbol']}**")
-            st.markdown("### 它属于哪个行业？")
+            st.markdown(f"### {q['symbol']} 属于哪个行业？")
             if not st.session_state.q_industry_answered:
                 cols = st.columns(4)
                 for i, opt in enumerate(q["options"]):
@@ -534,33 +706,18 @@ def main():
                             st.session_state.ind_user_choice = opt
                             st.rerun()
             if st.session_state.q_industry_answered:
-                uc = st.session_state.ind_user_choice
-                if uc == q["correct"]:
-                    st.success(f"✅ 正确！{q['symbol']} 属于 **{q['correct']}**")
+                if st.session_state.ind_user_choice == q["correct"]:
+                    st.success(f"✅ 正确！{q['symbol']} 属于 {q['correct']}")
                 else:
-                    st.error(f"❌ 错误。{q['symbol']} 属于 **{q['correct']}**")
-                    record_mistake("板块认知", q['symbol'], uc, q['correct'])
+                    st.error(f"❌ 错误。正确答案：{q['correct']}")
+                    record_mistake("板块", q['symbol'], st.session_state.ind_user_choice, q['correct'])
                 if st.button("继续下一题 (板块)"):
                     st.session_state.current_industry_q = None
                     st.session_state.q_industry_answered = False
                     st.rerun()
-        if st.session_state.score_industry["total"] > 0:
-            rate = st.session_state.score_industry["correct"] / st.session_state.score_industry["total"] * 100
-            st.sidebar.metric("板块正确率", f"{rate:.1f}%")
 
-    # ========== 标签4：买卖点 ==========
     with tab4:
-        st.subheader("任务：判断当前是买点、卖点还是观望")
-        with st.expander("📖 买卖点教学", expanded=False):
-            st.markdown("""
-            | 场景 | 特征 | 操作 |
-            |------|------|------|
-            | 突破买入 | 放量突破前高 | 买入 |
-            | 回踩买入 | 缩量回调至均线 | 买入 |
-            | 跌破卖出 | 放量跌破均线 | 卖出 |
-            | 冲高卖出 | 大涨后长上影 | 卖出 |
-            | 震荡观望 | 方向不明 | 观望 |
-            """)
+        st.subheader("任务：判断买点、卖点还是观望")
         if st.button("🎲 随机出题 (买卖点)", use_container_width=True, key="btn_trade"):
             with st.spinner("加载..."):
                 random.shuffle(STOCK_POOL)
@@ -573,7 +730,6 @@ def main():
                         last, prev = display.iloc[-1], display.iloc[-2]
                         ma20 = display["close"].rolling(20).mean().iloc[-1]
                         vol_mean = display["volume"].iloc[-6:-1].mean()
-
                         if last["close"] > prev["high"] and last["volume"] > vol_mean * 1.3:
                             scene, correct_action = "突破买入", "买入"
                         elif last["low"] <= ma20 * 1.02 and last["close"] > last["open"] and last["volume"] < vol_mean * 0.8:
@@ -590,11 +746,10 @@ def main():
                         }
                         st.session_state.q_trade_answered = False
                         break
-
         q = st.session_state.current_trade_q
         if q:
             st.plotly_chart(plot_kline(q["df"], f"{q['symbol']} 日K线"), use_container_width=True)
-            st.info(f"📌 当前场景：**{q['scene']}**")
+            st.info(f"场景：**{q['scene']}**")
             if not st.session_state.q_trade_answered:
                 c1, c2, c3 = st.columns(3)
                 if c1.button("🟢 买入", key="tb"):
@@ -619,34 +774,19 @@ def main():
                         st.session_state.score_trade["correct"] += 1
                     st.rerun()
             if st.session_state.q_trade_answered:
-                uc = st.session_state.trade_user_choice
-                if uc == q["correct_action"]:
-                    st.success(f"✅ 正确！{q['scene']}场景下，操作应是 **{q['correct_action']}**")
+                if st.session_state.trade_user_choice == q["correct_action"]:
+                    st.success(f"✅ 正确！{q['scene']} → {q['correct_action']}")
                 else:
-                    st.error(f"❌ 错误。{q['scene']}场景下，操作应是 **{q['correct_action']}**")
-                    record_mistake("买卖点", f"{q['symbol']} {q['scene']}", uc, q['correct_action'])
-                st.markdown("### 📖 后续走势")
+                    st.error(f"❌ 错误。{q['scene']} → {q['correct_action']}")
+                    record_mistake("买卖点", f"{q['symbol']} {q['scene']}", st.session_state.trade_user_choice, q['correct_action'])
                 st.dataframe(q["future"][["date", "open", "high", "low", "close"]])
                 if st.button("继续下一题 (买卖点)"):
                     st.session_state.current_trade_q = None
                     st.session_state.q_trade_answered = False
                     st.rerun()
-        if st.session_state.score_trade["total"] > 0:
-            rate = st.session_state.score_trade["correct"] / st.session_state.score_trade["total"] * 100
-            st.sidebar.metric("买卖点正确率", f"{rate:.1f}%")
 
-    # ========== 标签5：止损训练 ==========
     with tab5:
-        st.subheader("任务：给一只股票设定止损价")
-        with st.expander("📖 止损教学", expanded=False):
-            st.markdown("""
-            **止损是保命技能。**
-            - 亏10%需涨11%回本
-            - 亏50%需涨100%回本
-            - 亏80%需涨400%回本
-
-            **合理区间**：买入价 - (0.8~2.0) × ATR
-            """)
+        st.subheader("任务：设定止损价")
         if st.button("🎲 随机出题 (止损)", use_container_width=True, key="btn_stop"):
             with st.spinner("加载..."):
                 random.shuffle(STOCK_POOL)
@@ -666,14 +806,12 @@ def main():
                         }
                         st.session_state.q_stop_answered = False
                         break
-
         q = st.session_state.current_stop_q
         if q:
-            st.plotly_chart(plot_kline(q["df"], f"{q['symbol']} 日K线"), use_container_width=True)
-            st.markdown(f"### 当前股价：**{q['last_close']:.2f}**")
-            st.markdown("### 假设你买入，止损价是多少？")
+            st.plotly_chart(plot_kline(q["df"], f"{q['symbol']}"), use_container_width=True)
+            st.markdown(f"### 当前价：{q['last_close']:.2f}")
             if not st.session_state.q_stop_answered:
-                stop_input = st.number_input("输入止损价：", value=float(round(q["last_close"] * 0.95, 2)), step=0.01)
+                stop_input = st.number_input("止损价：", value=float(round(q["last_close"] * 0.95, 2)), step=0.01)
                 if st.button("提交", key="submit_stop"):
                     st.session_state.stop_user_choice = stop_input
                     st.session_state.q_stop_answered = True
@@ -683,37 +821,21 @@ def main():
                     st.rerun()
             if st.session_state.q_stop_answered:
                 us = st.session_state.stop_user_choice
-                ok = q["stop_low"] <= us <= q["stop_high"]
-                if ok:
-                    st.success(f"✅ 合理！你的止损价 {us:.2f} 在合理区间")
+                if q["stop_low"] <= us <= q["stop_high"]:
+                    st.success(f"✅ 合理！")
                 else:
-                    st.error(f"❌ 不太合理。你的止损价 {us:.2f}")
-                    record_mistake("止损训练", q['symbol'], f"{us:.2f}", f"{q['stop_low']:.2f}~{q['stop_high']:.2f}")
-                st.markdown("### 📖 分析")
+                    st.error(f"❌ 不合理。合理区间：{q['stop_low']:.2f} ~ {q['stop_high']:.2f}")
+                    record_mistake("止损", q['symbol'], f"{us:.2f}", f"{q['stop_low']:.2f}~{q['stop_high']:.2f}")
                 st.markdown(f"- ATR：{q['atr']:.2f}")
-                st.markdown(f"- **合理区间：{q['stop_low']:.2f} ~ {q['stop_high']:.2f}**")
+                st.markdown(f"- 合理区间：{q['stop_low']:.2f} ~ {q['stop_high']:.2f}")
                 if st.button("继续下一题 (止损)"):
                     st.session_state.current_stop_q = None
                     st.session_state.q_stop_answered = False
                     st.rerun()
-        if st.session_state.score_stop["total"] > 0:
-            rate = st.session_state.score_stop["correct"] / st.session_state.score_stop["total"] * 100
-            st.sidebar.metric("止损正确率", f"{rate:.1f}%")
 
-    # ========== 标签6：未来趋势 ==========
     with tab6:
-        st.subheader("任务：判断未来3天是涨还是跌")
-        with st.expander("📖 未来趋势教学", expanded=False):
-            st.markdown("""
-            ## 四步分析法
-            1. **均线排列**：价格 > MA5 > MA20 = 多头排列
-            2. **MACD**：柱>0且变长 = 多头增强
-            3. **量价**：放量上涨 = 资金进场
-            4. **RSI**：>70超买，<30超卖
-
-            **信号一致 → 判断可靠；信号矛盾 → 看均线**
-            """)
-        if st.button("🎲 随机出题 (未来趋势)", use_container_width=True, key="btn_trend"):
+        st.subheader("任务：判断未来3天涨跌")
+        if st.button("🎲 随机出题 (趋势)", use_container_width=True, key="btn_trend"):
             with st.spinner("加载..."):
                 random.shuffle(STOCK_POOL)
                 for symbol in STOCK_POOL:
@@ -736,21 +858,16 @@ def main():
                         }
                         st.session_state.q_trend_answered = False
                         break
-
         q = st.session_state.current_trend_q
         if q:
             ind = q["indicators"]
-            st.plotly_chart(plot_kline(q["df"], f"{q['symbol']} 日K线"), use_container_width=True)
-            st.markdown(f"### 当前股价：**{q['current_price']:.2f}**")
-            st.markdown("### 📊 当前指标")
+            st.plotly_chart(plot_kline(q["df"], f"{q['symbol']}"), use_container_width=True)
             c1, c2, c3, c4 = st.columns(4)
-            c1.metric("均线排列", ind['ma_alignment'])
-            c2.metric("MACD", f"{ind['macd_hist_value']:.3f}", delta=ind['macd_status'])
-            c3.metric("RSI", f"{ind['rsi']:.1f}", delta=ind['rsi_status'])
+            c1.metric("均线", ind['ma_alignment'])
+            c2.metric("MACD", ind['macd_status'])
+            c3.metric("RSI", f"{ind['rsi']:.1f}")
             c4.metric("量价", ind['vol_price_status'])
-
             if not st.session_state.q_trend_answered:
-                st.markdown("### 未来3天，看涨还是看跌？")
                 c1, c2 = st.columns(2)
                 if c1.button("📈 看涨", key="tr_up"):
                     st.session_state.trend_user_choice = "涨"
@@ -766,93 +883,59 @@ def main():
                     if q["actual_direction"] == "跌":
                         st.session_state.score_trend["correct"] += 1
                     st.rerun()
-
             if st.session_state.q_trend_answered:
                 uc = st.session_state.trend_user_choice
-                actual = q["actual_direction"]
-                actual_pct = q["actual_pct"]
-                if uc == actual:
-                    st.success(f"✅ 正确！实际 **{actual}** {abs(actual_pct):.2f}%")
+                if uc == q["actual_direction"]:
+                    st.success(f"✅ 正确！实际 {q['actual_direction']} {abs(q['actual_pct']):.2f}%")
                 else:
-                    st.error(f"❌ 错误。实际 **{actual}** {abs(actual_pct):.2f}%，你选 {uc}")
-                    record_mistake("未来趋势", f"{q['symbol']}", uc, actual, f"实际{actual_pct:+.2f}%")
-
-                st.markdown("### 📖 实际未来3天走势")
+                    st.error(f"❌ 错误。实际 {q['actual_direction']} {abs(q['actual_pct']):.2f}%")
+                    record_mistake("趋势", q['symbol'], uc, q['actual_direction'])
                 for _, row in q["future_3"].iterrows():
                     change = (row["close"] - row["open"]) / row["open"] * 100
-                    st.markdown(f"{'🔴' if change > 0 else '🟢'} {row['date'].strftime('%Y-%m-%d')}：开 {row['open']:.2f}，收 {row['close']:.2f}，{change:+.2f}%")
-
-                st.markdown("---")
-                st.markdown("### 📖 逐指标复盘")
-                st.markdown(f"**1️⃣ 均线排列**：{ind['ma_alignment']}")
-                if ind['ma_alignment'] == "多头排列（强势）":
-                    st.markdown("  💡 价格 > MA5 > MA20 → 看涨")
-                elif ind['ma_alignment'] == "空头排列（弱势）":
-                    st.markdown("  💡 价格 < MA5 < MA20 → 看跌")
-                else:
-                    st.markdown("  💡 均线交织 → 观望")
-
-                st.markdown(f"**2️⃣ MACD**：{ind['macd_status']} ({ind['macd_cross']})")
-                if ind['macd_status'] == "多头增强":
-                    st.markdown("  💡 柱>0且变长 → 看涨")
-                elif ind['macd_status'] == "空头增强":
-                    st.markdown("  💡 柱<0且变长 → 看跌")
-                else:
-                    st.markdown(f"  💡 {ind['macd_status']} → 动能变化中")
-
-                st.markdown(f"**3️⃣ 量价**：{ind['vol_price_status']}")
-                if ind['vol_price_status'] == "放量上涨（强势）":
-                    st.markdown("  💡 资金进场 → 看涨")
-                elif ind['vol_price_status'] == "放量下跌（弱势）":
-                    st.markdown("  💡 资金出逃 → 看跌")
-                else:
-                    st.markdown(f"  💡 {ind['vol_price_status']}")
-
-                st.markdown(f"**4️⃣ RSI**：{ind['rsi']:.1f} ({ind['rsi_status']})")
-                if ind['rsi'] > 70:
-                    st.markdown("  💡 超买 → 可能回调")
-                elif ind['rsi'] < 30:
-                    st.markdown("  💡 超卖 → 可能反弹")
-                else:
-                    st.markdown("  💡 中性")
-
-                st.markdown("---")
-                if uc == actual:
-                    st.markdown("✅ 判断正确！继续强化多维度分析方法。")
-                else:
-                    st.markdown("❌ 判断错误。复盘：哪个指标误导了你？下次要更重视什么？")
-
-                if st.button("继续下一题 (未来趋势)"):
+                    st.markdown(f"{'🔴' if change > 0 else '🟢'} {row['date'].strftime('%Y-%m-%d')}：{change:+.2f}%")
+                if st.button("继续下一题 (趋势)"):
                     st.session_state.current_trend_q = None
                     st.session_state.q_trend_answered = False
                     st.rerun()
-        if st.session_state.score_trend["total"] > 0:
-            rate = st.session_state.score_trend["correct"] / st.session_state.score_trend["total"] * 100
-            st.sidebar.metric("未来趋势正确率", f"{rate:.1f}%")
 
-    # ========== 标签7：错题本 ==========
     with tab7:
+        tab_position()
+
+    with tab8:
+        tab_market()
+
+    with tab9:
+        tab_simulation()
+
+    with tab10:
         st.subheader("📝 错题本")
         if len(st.session_state.mistakes) == 0:
-            st.info("暂无错题。继续练习，错题会自动记录。")
+            st.info("暂无错题")
         else:
             st.markdown(f"### 共 {len(st.session_state.mistakes)} 道错题")
             modules = {}
             for m in st.session_state.mistakes:
                 modules[m["module"]] = modules.get(m["module"], 0) + 1
-            st.markdown("#### 错题分布")
             for mod, count in sorted(modules.items(), key=lambda x: -x[1]):
                 st.markdown(f"- **{mod}**：{count} 道")
             st.markdown("---")
             for m in reversed(st.session_state.mistakes[-30:]):
                 with st.expander(f"[{m['module']}] {m['question']} - {m['time']}"):
-                    st.markdown(f"- 你的答案：**{m['user_answer']}**")
-                    st.markdown(f"- 正确答案：**{m['correct_answer']}**")
-                    if m.get("detail"):
-                        st.markdown(f"- 解析：{m['detail']}")
+                    st.markdown(f"- 你选：{m['user_answer']}")
+                    st.markdown(f"- 正确：{m['correct_answer']}")
             if st.button("清空错题本"):
                 st.session_state.mistakes = []
                 st.rerun()
+
+    # 侧边栏成绩
+    for name, key in [("形态", "score_pattern"), ("分时", "score_intra"),
+                      ("板块", "score_industry"), ("买卖点", "score_trade"),
+                      ("止损", "score_stop"), ("趋势", "score_trend"),
+                      ("仓位", "score_pos"), ("大盘", "score_mkt")]:
+        if st.session_state[key]["total"] > 0:
+            rate = st.session_state[key]["correct"] / st.session_state[key]["total"] * 100
+            st.sidebar.metric(f"{name}正确率", f"{rate:.1f}%")
+
 
 if __name__ == "__main__":
     main()
