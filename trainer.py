@@ -253,6 +253,20 @@ def calculate_all_indicators(df, current_idx):
     ma20 = slice_df["close"].rolling(20).mean().iloc[-1] if len(slice_df) >= 20 else ma5
     ma60 = slice_df["close"].rolling(60).mean().iloc[-1] if len(slice_df) >= 60 else ma20
     
+    # 均价线计算
+    avg_prices = (slice_df["open"] + slice_df["high"] + slice_df["low"] + slice_df["close"]) / 4
+    cum_amount = (avg_prices * slice_df["volume"]).cumsum()
+    cum_volume = slice_df["volume"].cumsum()
+    avg_price_line = cum_amount / cum_volume
+    current_avg_price = avg_price_line.iloc[-1]
+    
+    if last["close"] > current_avg_price * 1.002:
+        avg_position = "高于均价线 (偏强)"
+    elif last["close"] < current_avg_price * 0.998:
+        avg_position = "低于均价线 (偏弱)"
+    else:
+        avg_position = "接近均价线 (中性)"
+    
     vol_avg = slice_df["volume"].iloc[-6:-1].mean() if len(slice_df) >= 6 else slice_df["volume"].mean()
     vol_ratio = last["volume"] / vol_avg if vol_avg > 0 else 1
     
@@ -327,7 +341,9 @@ def calculate_all_indicators(df, current_idx):
         "vol_price_status": vol_price_status,
         "macd_hist_value": macd_hist_value, "macd_status": macd_status, "macd_cross": macd_cross,
         "rsi": rsi, "rsi_status": rsi_status,
-        "short_trend": short_trend
+        "short_trend": short_trend,
+        "avg_position": avg_position,
+        "current_avg_price": current_avg_price
     }
 
 # ============================================================
