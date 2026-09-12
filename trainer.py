@@ -527,6 +527,99 @@ def tab_simulation():
         st.rerun()
 
 
+# ========== 个股分析 ==========
+def tab_stock_analysis():
+    st.subheader("📈 个股分析")
+    st.caption("输入股票代码，系统自动给出综合分析和操作建议")
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        symbol_input = st.text_input("输入股票代码（6位数字）", value="600519")
+    with col2:
+        analyze_btn = st.button("开始分析", use_container_width=True)
+
+    if analyze_btn:
+        with st.spinner("正在分析..."):
+            df = fetch_daily(symbol_input)
+            if df is None or len(df) < 60:
+                st.error("⚠️ 无法获取数据，请检查代码是否正确")
+                return
+            ind = calculate_all_indicators(df, len(df) - 1)
+            st.session_state.analysis_result = {"df": df, "symbol": symbol_input, "ind": ind}
+
+    result = st.session_state.get("analysis_result")
+    if result:
+        df = result["df"]
+        ind = result["ind"]
+        symbol = result["symbol"]
+
+        st.plotly_chart(plot_kline(df.tail(60), f"{symbol} 近60日K线"), use_container_width=True)
+
+        st.markdown("### 📊 基础数据")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("当前价", f"{ind['last_close']:.2f}", delta=f"{ind['pct_change']:.2f}%")
+        c2.metric("MA5", f"{ind['ma5']:.2f}")
+        c3.metric("MA20", f"{ind['ma20']:.2f}")
+        c4.metric("MA60", f"{ind['ma60']:.2f}")
+
+        st.markdown("### 📈 技术指标")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("均线排列", ind['ma_alignment'])
+        c2.metric("MACD", ind['macd_status'], delta=ind['macd_cross'])
+        c3.metric("RSI", f"{ind['rsi']:.1f}", delta=ind['rsi_status'])
+        c4.metric("量价", ind['vol_price_status'])
+
+        st.markdown("### 🎯 综合评分")
+        score = 0
+        details = []
+        if "高于" in ind['price_position']:
+            score += 1; details.append("+1 价格在MA5上方")
+        elif "低于" in ind['price_position']:
+            score -= 1; details.append("-1 价格在MA5下方")
+        if ind['ma_alignment'] == "多头排列（强势）":
+            score += 1; details.append("+1 均线多头排列")
+        elif ind['ma_alignment'] == "空头排列（弱势）":
+            score -= 1; details.append("-1 均线空头排列")
+        if ind['macd_status'] == "多头增强":
+            score += 1; details.append("+1 MACD多头增强")
+        elif ind['macd_status'] == "空头增强":
+            score -= 1; details.append("-1 MACD空头增强")
+        if ind['vol_price_status'] == "放量上涨（强势）":
+            score += 1; details.append("+1 放量上涨")
+        elif ind['vol_price_status'] == "放量下跌（弱势）":
+            score -= 1; details.append("-1 放量下跌")
+        if ind['rsi'] < 30:
+            score += 1; details.append("+1 RSI超卖")
+        elif ind['rsi'] > 70:
+            score -= 1; details.append("-1 RSI超买")
+
+        for d in details:
+            st.markdown(f"- {d}")
+        st.markdown(f"**总分：{score:+d}**")
+
+        st.markdown("### 💡 操作建议")
+        if score >= 3:
+            st.success("🔵 **强烈看多** — 多信号共振，可以考虑买入")
+        elif score >= 1:
+            st.info("🔵 **偏多** — 可轻仓介入，注意止损")
+        elif score <= -3:
+            st.error("🔴 **强烈看空** — 建议离场观望")
+        elif score <= -1:
+            st.warning("🟡 **偏空** — 谨慎操作，控制仓位")
+        else:
+            st.info("⚪ **中性** — 方向不明，建议观望")
+
+        st.markdown("### 🛡️ 止损位建议")
+        high, low = df["high"], df["low"]
+        prev_close = df["close"].shift(1)
+        tr = pd.concat([high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+        atr = tr.rolling(14).mean().iloc[-1]
+        stop_low = ind['last_close'] - 2 * atr
+        stop_high = ind['last_close'] - 0.8 * atr
+        st.markdown(f"- ATR：**{atr:.2f}**")
+        st.markdown(f"- 合理止损区间：**{stop_low:.2f} ~ {stop_high:.2f}**")
+        st.markdown(f"- 建议止损价：**{stop_high:.2f}**（较保守）或 **{stop_low:.2f}**（较宽松）")
+
 # ========== 主程序 ==========
 def main():
     init_mistakes()
@@ -546,12 +639,12 @@ def main():
         if key not in st.session_state:
             st.session_state[key] = None
 
-    tabs = st.tabs([
+       tabs = st.tabs([
         "📊 形态", "⚡ 分时", "🏭 板块", "🎯 买卖点",
         "🛡️ 止损", "🔮 趋势", "💰 仓位", "🌍 大盘",
-        "💼 模拟盘", "📝 错题本"
+        "💼 模拟盘", "📝 错题本", "📈 个股分析"
     ])
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = tabs
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = tabs
 
     with tab1:
         st.subheader(f"任务：看K线，选形态名称（共{len(PATTERN_NAMES)}种）")
@@ -923,9 +1016,12 @@ def main():
                 with st.expander(f"[{m['module']}] {m['question']} - {m['time']}"):
                     st.markdown(f"- 你选：{m['user_answer']}")
                     st.markdown(f"- 正确：{m['correct_answer']}")
-            if st.button("清空错题本"):
+                        if st.button("清空错题本"):
                 st.session_state.mistakes = []
                 st.rerun()
+
+    with tab11:
+        tab_stock_analysis()
 
     # 侧边栏成绩
     for name, key in [("形态", "score_pattern"), ("分时", "score_intra"),
