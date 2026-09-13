@@ -1,0 +1,6 @@
+.streamlit/secrets.toml
+wrong_answers.db
+__pycache__/
+*.pyc
+venv/
+.DS_Store
