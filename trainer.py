@@ -1421,7 +1421,12 @@ def render_pattern_training():
     # 绘制K线图（只显示形态位置之前的K线）
     fig = plot_kline(df, title=f"{q['name']} 日K线（截止到形态出现位置）", 
                      show_ma=True, show_volume=True, height=500)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
 
     st.caption("👆 图中最后一根K线就是需要判断的形态")
 
@@ -1837,7 +1842,12 @@ def render_intraday_training():
     # 加一条竖线标记"当前时刻"
     fig.add_vline(x=q["df"]["time"].iloc[-1], line_width=2,
                   line_dash="dash", line_color="#ffcc00")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
 
     # 实时指标展示
     st.markdown("### 📊 当前盘面指标")
@@ -2189,7 +2199,12 @@ def render_sector_training():
             if df is not None and len(df) > 0:
                 fig = plot_kline(df.tail(60), title=f"{q['symbol']} {q['name']}",
                                  show_ma=True, show_volume=True, height=450)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
             else:
                 st.warning("K线数据加载失败。")
 
@@ -2386,7 +2401,12 @@ def render_trade_training():
 
     fig = plot_kline(q["df"], title=f"{q['name']} 日K线",
                      show_ma=True, show_volume=True, height=500)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
 
     # 选项
     if not st.session_state.trade_answered:
@@ -2652,7 +2672,12 @@ def render_stop_training():
     st.markdown(f"### {q['name']}（{q['symbol']}）")
     fig = plot_kline(q["df"].tail(60), title=f"{q['name']} 日K线（最后60根）",
                      show_ma=True, show_volume=True, height=500)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
 
     # 显示当前信息
     c1, c2, c3 = st.columns(3)
@@ -2897,7 +2922,12 @@ def render_trend_training():
     st.markdown(f"### {q['name']}（{q['symbol']}）")
     fig = plot_kline(q["df"].tail(60), title=f"{q['name']} 日K线（最后60根）",
                      show_ma=True, show_volume=True, height=500)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
 
     # 显示指标概览
     st.markdown("### 📊 当前指标概览")
@@ -3604,7 +3634,12 @@ def render_market_trend():
     st.markdown(f"### {q['index_name']}（截止到当前位置）")
     fig = plot_kline(q["df"].tail(120), title=f"{q['index_name']}",
                      show_ma=True, show_volume=True, height=500)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
 
     # 当前指标
     ind = q["detail"]["ind"]
@@ -4639,7 +4674,12 @@ def render_stock_analysis():
     st.markdown(f"### {code} {name}")
     fig = plot_kline(df.tail(120), title=f"{code} {name}",
                      show_ma=True, show_volume=True, height=500)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config={
+    'scrollZoom': False,      # 禁止滚动缩放
+    'displayModeBar': False,  # 隐藏右上角工具栏
+    'doubleClick': 'reset',   # 双击恢复初始状态
+    'showTips': False         # 隐藏提示
+})
 
     # ---------- 当前基础数据 ----------
     st.markdown("### 📊 基础数据")
