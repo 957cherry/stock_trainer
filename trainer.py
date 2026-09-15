@@ -112,96 +112,95 @@ def get_industry(code: str) -> str:
 @st.cache_data(ttl=1800, show_spinner=False)
 def fetch_daily(symbol: str, days: int = 250):
     """
-    获取日线数据。优先同花顺API，失败则切AkShare。
-    
-    参数：
-        symbol: 6位股票代码，如 "600519"
-        days: 获取最近多少自然日的数据
-    返回：
-        DataFrame(date, open, high, low, close, volume) 或 None
+    获取日线数据（纯同花顺官方API版）
     """
-    # ---------- 方案A：同花顺API ----------
-    if API_KEY:
-        try:
-            if symbol.startswith(("60", "68")):
-                ths_code = symbol + ".SH"
-            else:
-                ths_code = symbol + ".SZ"
-
-            url = "https://fuyao.aicubes.cn/api/a-share/prices/historical"
-            headers = {"X-api-key": API_KEY}
-            end_date = datetime.now()
-            start_date = end_date - timedelta(days=days)
-            params = {
-                "thscode": ths_code,
-                "interval": "1d",
-                "start": int(start_date.timestamp() * 1000),
-                "end": int(end_date.timestamp() * 1000),
-                "adjust": "forward"
-            }
-            for attempt in range(3):
-                try:
-                    r = requests.get(url, headers=headers, params=params, timeout=15)
-                    if r.status_code == 200:
-                        data = r.json()
-                        if data.get("code") == 0:
-                            items = data.get("data", {}).get("item", [])
-                            if items:
-                                df = pd.DataFrame(items).rename(columns={
-                                    "date_ms": "date",
-                                    "open_price": "open",
-                                    "high_price": "high",
-                                    "low_price": "low",
-                                    "close_price": "close",
-                                    "volume": "volume"
-                                })
-                                df["date"] = pd.to_datetime(df["date"], unit="ms")
-                                return df[["date", "open", "high", "low", "close", "volume"]]
-                except Exception:
-                    if attempt < 2:
-                        import time
-                        time.sleep(1)
-        except Exception:
-            pass
-
-    # ---------- 方案B：AkShare备用 ----------
-    try:
-        import akshare as ak
-        end = datetime.now().strftime("%Y%m%d")
-        start = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
-        df = ak.stock_zh_a_hist(
-            symbol=symbol, period="daily",
-            start_date=start, end_date=end, adjust="qfq"
-        )
-        if df is None or df.empty:
-            return None
-        df = df.rename(columns={
-            "日期": "date", "开盘": "open", "收盘": "close",
-            "最高": "high", "最低": "low", "成交量": "volume"
-        })
-        df["date"] = pd.to_datetime(df["date"])
-        return df[["date", "open", "high", "low", "close", "volume"]]
-    except Exception:
+    if not API_KEY:
+        st.error("未配置同花顺 API Key，无法获取数据。")
         return None
 
+    if symbol.startswith(("60", "68")):
+        ths_code = symbol + ".SH"
+    else:
+        ths_code = symbol + ".SZ"
+
+    url = "https://fuyao.aicubes.cn/api/a-share/prices/historical"
+    headers = {"X-api-key": API_KEY}
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    params = {
+        "thscode": ths_code,
+        "interval": "1d",
+        "start": int(start_date.timestamp() * 1000),
+        "end": int(end_date.timestamp() * 1000),
+        "adjust": "forward"
+    }
+
+    for attempt in range(3):
+        try:
+            r = requests.get(url, headers=headers, params=params, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("code") == 0:
+                    items = data.get("data", {}).get("item", [])
+                    if items:
+                        df = pd.DataFrame(items).rename(columns={
+                            "date_ms": "date", "open_price": "open",
+                            "high_price": "high", "low_price": "low",
+                            "close_price": "close", "volume": "volume"
+                        })
+                        df["date"] = pd.to_datetime(df["date"], unit="ms")
+                        return df[["date", "open", "high", "low", "close", "volume"]]
+        except Exception:
+            if attempt < 2:
+                import time
+                time.sleep(1)
+    return None
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def fetch_market_index(index_code: str = "000001", days: int = 250):
     """
-    获取大盘指数日线。指数代码：
-        000001=上证指数, 399001=深证成指, 399006=创业板指
+    获取大盘指数日线（纯同花顺官方API版）
     """
-    try:
-        import akshare as ak
-        prefix = "sh" if index_code.startswith("000") else "sz"
-        df = ak.stock_zh_index_daily(symbol=f"{prefix}{index_code}")
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.rename(columns={
-            "date": "date", "open": "open", "high": "high",
-            "low": "low", "close": "close", "volume": "volume"
-        })
-        return df.sort_values("date").tail(days).reset_index(drop=True)
-    except Exception:
+    if not API_KEY:
         return None
 
+    if index_code.startswith("000"):
+        ths_code = index_code + ".SH"
+    else:
+        ths_code = index_code + ".SZ"
+
+    url = "https://fuyao.aicubes.cn/api/a-share/prices/historical"
+    headers = {"X-api-key": API_KEY}
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    params = {
+        "thscode": ths_code,
+        "interval": "1d",
+        "start": int(start_date.timestamp() * 1000),
+        "end": int(end_date.timestamp() * 1000),
+        "adjust": "forward"
+    }
+
+    for attempt in range(3):
+        try:
+            r = requests.get(url, headers=headers, params=params, timeout=15)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("code") == 0:
+                    items = data.get("data", {}).get("item", [])
+                    if items:
+                        df = pd.DataFrame(items).rename(columns={
+                            "date_ms": "date", "open_price": "open",
+                            "high_price": "high", "low_price": "low",
+                            "close_price": "close", "volume": "volume"
+                        })
+                        df["date"] = pd.to_datetime(df["date"], unit="ms")
+                        return df[["date", "open", "high", "low", "close", "volume"]]
+        except Exception:
+            if attempt < 2:
+                import time
+                time.sleep(1)
+    return None
 # ============================================================
 # 5. 技术指标计算
 # ============================================================
@@ -4884,59 +4883,89 @@ INDUSTRY_PB_REF = {
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_fundamentals(code: str):
     """
-    获取个股基本面数据。
-    返回：dict 或 None
-        {
-            "pe": 市盈率, "pb": 市净率, "roe": 净资产收益率,
-            "total_mv": 总市值, "name": 股票名称, "industry": 行业,
-        }
+    获取个股基本面数据（纯同花顺官方API版）
     """
     result = {
         "pe": None, "pb": None, "roe": None,
         "total_mv": None, "industry": get_industry(code),
-        "name": get_stock_name(code),
+        "name": get_stock_name(code), "error": None
     }
 
-    # ---------- 方案A：AkShare 获取估值 ----------
-    try:
-        import akshare as ak
-
-        # 1) 实时估值（PE、PB、市值）
-        try:
-            df_spot = ak.stock_zh_a_spot_em()
-            row = df_spot[df_spot["代码"] == code]
-            if not row.empty:
-                row = row.iloc[0]
-                result["name"] = str(row.get("名称", result["name"]))
-                result["pe"] = safe_float(row.get("市盈率-动态", None))
-                result["pb"] = safe_float(row.get("市净率", None))
-                result["total_mv"] = safe_float(row.get("总市值", None))
-        except Exception:
-            pass
-
-        # 2) ROE（从财务指标获取最近一期）
-        try:
-            df_fin = ak.stock_financial_analysis_indicator(symbol=code, start_year="2023")
-            if df_fin is not None and not df_fin.empty:
-                # 找ROE列
-                roe_col = None
-                for col in df_fin.columns:
-                    if "净资产收益率" in str(col):
-                        roe_col = col
-                        break
-                if roe_col:
-                    latest = df_fin.iloc[0][roe_col]
-                    result["roe"] = safe_float(latest)
-        except Exception:
-            pass
-
-    except ImportError:
-        pass
-
-    # 如果PE和PB都拿不到，返回None
-    if result["pe"] is None and result["pb"] is None:
+    if not API_KEY:
         return None
 
+    if code.startswith(("60", "68")):
+        thscode = code + ".SH"
+    else:
+        thscode = code + ".SZ"
+
+    base_url = "https://fuyao.aicubes.cn"
+    headers = {"X-api-key": API_KEY}
+
+    def safe_val(v):
+        if v is None or pd.isna(v):
+            return None
+        try:
+            s = str(v).strip()
+            if s in ['-', '--', '', 'null']:
+                return None
+            return float(s)
+        except (ValueError, TypeError):
+            return None
+
+    # 1. 获取 PE/PB/总市值
+    try:
+        url = f"{base_url}/api/a-share/valuations/snapshot"
+        params = {"thscodes": thscode}
+        r = requests.get(url, headers=headers, params=params, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("code") == 0:
+                items = data.get("data", {}).get("item", [])
+                if items:
+                    item = items[0]
+                    result["pe"] = safe_val(item.get("pe_ttm"))
+                    result["pb"] = safe_val(item.get("pb_mrq"))
+                    result["total_mv"] = safe_val(item.get("total_mv"))
+    except Exception as e:
+        result["error"] = f"估值接口异常: {str(e)[:30]}"
+
+    # 2. 获取 ROE
+    try:
+        current_year = datetime.now().year
+        report_periods = [
+            f"{current_year - 1}-4", f"{current_year}-3",
+            f"{current_year}-2", f"{current_year}-1",
+            f"{current_year - 2}-4",
+        ]
+        url = f"{base_url}/api/a-share/financials/indicators"
+        for report in report_periods:
+            try:
+                params = {"thscode": thscode, "report": report}
+                r = requests.get(url, headers=headers, params=params, timeout=10)
+                if r.status_code == 200:
+                    data = r.json()
+                    if data.get("code") == 0:
+                        abilities = data.get("data", {}).get("abilities", [])
+                        for ability in abilities:
+                            if ability.get("ability") == "profitability":
+                                for ind in ability.get("indicators", []):
+                                    if ind.get("index_id") == "index_weighted_avg_roe":
+                                        roe_val = safe_val(ind.get("value"))
+                                        if roe_val is not None:
+                                            result["roe"] = roe_val
+                                            break
+                                if result["roe"] is not None:
+                                    break
+                        if result["roe"] is not None:
+                            break
+            except Exception:
+                continue
+    except Exception as e:
+        result["error"] = f"财务指标接口异常: {str(e)[:30]}"
+
+    if result["pe"] is None and result["pb"] is None:
+        return None
     return result
 
 
@@ -5245,7 +5274,7 @@ def render_fundamental_analysis():
         """)
 
     # ---------- 数据来源说明 ----------
-    st.caption("📌 数据来源：AkShare（东方财富公开数据）。PE/PB为实时估值，ROE为最近一期财报数据。")
+    st.caption("📌 数据来源：同花顺官方API。PE/PB为实时估值，ROE为最近一期财报数据。")
 
 
 # ============================================================
@@ -5401,7 +5430,7 @@ def render_welcome():
     - ✅ **只练真实出现过的形态**（系统自动从历史K线中检测）
     - ✅ **答错自动记录到错题本**（SQLite持久化，刷新不丢）
     - ✅ **红涨绿跌**（符合A股习惯）
-    - ✅ **数据来源**：同花顺API为主，AkShare为备用
+    - ✅ **数据来源**：全面采用同花顺官方API，稳定可靠
 
     ---
 
